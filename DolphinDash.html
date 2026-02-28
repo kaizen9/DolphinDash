@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🐬 DOLPHIN DASH — BNB Testnet Arcade</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a1628;overflow:hidden;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#fff;touch-action:none;user-select:none}
+
+/* ===== WEB3 STATUS BAR ===== */
+#web3-bar{position:fixed;top:0;left:0;right:0;z-index:1000;background:linear-gradient(90deg,#0d1b2a,#1b2838,#0d1b2a);border-bottom:2px solid #1a6b8a;display:flex;align-items:center;justify-content:space-between;padding:6px 16px;font-size:13px;height:38px;box-shadow:0 2px 12px rgba(0,0,0,0.6)}
+#web3-bar .section{display:flex;align-items:center;gap:14px;flex-wrap:nowrap}
+#web3-bar .badge{background:rgba(240,185,11,0.15);border:1px solid rgba(240,185,11,0.4);border-radius:12px;padding:2px 10px;font-size:11px;color:#f0b90b;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle}
+.dot.green{background:#4caf50;box-shadow:0 0 8px #4caf50}
+.dot.red{background:#f44336;box-shadow:0 0 8px #f44336}
+.dot.gray{background:#555}
+
+/* ===== CANVAS ===== */
+#gameCanvas{display:block;position:fixed;top:38px;left:0;cursor:default}
+
+/* ===== OVERLAYS ===== */
+.overlay{position:fixed;top:38px;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:500;pointer-events:none;opacity:0;transition:opacity 0.5s}
+.overlay.active{pointer-events:all;opacity:1}
+.overlay-bg{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(10,22,40,0.6),rgba(10,22,40,0.95))}
+.overlay-content{position:relative;z-index:1;text-align:center;max-width:520px;padding:20px;width:90%}
+
+/* ===== BUTTONS ===== */
+.btn{display:inline-block;padding:14px 34px;margin:8px;border:none;border-radius:30px;font-size:16px;font-weight:700;cursor:pointer;transition:all 0.2s;text-transform:uppercase;letter-spacing:1px;font-family:inherit}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,0.4)}
+.btn:active{transform:translateY(0)}
+.btn-primary{background:linear-gradient(135deg,#f0b90b,#f8d12f);color:#1a1a2e;box-shadow:0 4px 15px rgba(240,185,11,0.3)}
+.btn-secondary{background:linear-gradient(135deg,#1a6b8a,#2196a6);color:#fff;box-shadow:0 4px 15px rgba(26,107,138,0.3)}
+.btn-disabled{background:#333!important;color:#666!important;cursor:not-allowed!important;box-shadow:none!important}
+.btn-disabled:hover{transform:none!important;box-shadow:none!important}
+
+/* ===== LOADING ===== */
+#loadingOverlay{position:fixed;inset:0;z-index:2000;background:rgba(10,22,40,0.92);display:none;flex-direction:column;align-items:center;justify-content:center}
+#loadingOverlay.active{display:flex}
+.spinner{width:54px;height:54px;border:4px solid rgba(240,185,11,0.2);border-top-color:#f0b90b;border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:20px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-bubbles{position:absolute;width:100%;height:100%;pointer-events:none;overflow:hidden}
+.loading-bubble{position:absolute;bottom:-20px;background:rgba(126,184,212,0.15);border-radius:50%;animation:floatUp 3s ease-in infinite}
+@keyframes floatUp{0%{transform:translateY(0) scale(1);opacity:0.6}100%{transform:translateY(-100vh) scale(0.3);opacity:0}}
+
+/* ===== TOAST ===== */
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(10,22,40,0.95);border:1px solid #1a6b8a;border-radius:14px;padding:14px 28px;z-index:3000;font-size:14px;opacity:0;transition:opacity 0.3s;pointer-events:none;max-width:92vw;text-align:center;backdrop-filter:blur(8px)}
+#toast.show{opacity:1;pointer-events:auto}
+#toast a{color:#f0b90b;text-decoration:underline}
+
+/* ===== SOUND TOGGLE ===== */
+#soundToggle{position:fixed;bottom:14px;right:14px;z-index:600;background:rgba(26,107,138,0.5);border:1px solid rgba(26,107,138,0.6);border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;transition:all 0.2s}
+#soundToggle:hover{background:rgba(26,107,138,0.8);transform:scale(1.1)}
+
+/* ===== TESTNET BADGE ===== */
+.testnet-badge{background:linear-gradient(135deg,rgba(240,185,11,0.12),rgba(240,185,11,0.06));border:1px solid rgba(240,185,11,0.35);border-radius:8px;padding:5px 14px;font-size:11px;color:#f0b90b;display:inline-block;margin-top:10px;letter-spacing:0.5px}
+
+/* ===== GAME OVER STATS ===== */
+.stats-box{background:rgba(26,107,138,0.15);border:1px solid rgba(26,107,138,0.3);border-radius:14px;padding:18px;margin:16px 0}
+.stats-row{display:flex;justify-content:center;gap:28px;font-size:14px;flex-wrap:wrap}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:600px){
+  #web3-bar{font-size:11px;padding:4px 8px;gap:6px;height:34px}
+  #web3-bar .section{gap:6px}
+  .btn{padding:12px 24px;font-size:14px;margin:6px}
+  .overlay-content{padding:14px}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== WEB3 STATUS BAR ===== -->
+<div id="web3-bar">
+  <div class="section">
+    <span id="networkStatus"><span class="dot gray"></span> Not Connected</span>
+    <span class="badge">⚠️ TESTNET</span>
+  </div>
+  <div class="section">
+    <span id="walletAddr">🔗 No Wallet</span>
+    <span id="balanceDisplay"></span>
+    <span id="creditsDisplay"></span>
+  </div>
+</div>
+
+<!-- ===== GAME CANVAS ===== -->
+<canvas id="gameCanvas"></canvas>
+
+<!-- ===== TITLE SCREEN ===== -->
+<div class="overlay active" id="titleScreen">
+  <div class="overlay-bg"></div>
+  <div class="overlay-content">
+    <div id="titleText" style="margin-bottom:6px;height:70px;line-height:70px"></div>
+    <p style="color:#7eb8d4;font-size:16px;margin-bottom:20px">🌊 A Side-Scrolling Ocean Arcade 🌊</p>
+    <div class="testnet-badge">⚠️ TESTNET BUILD — Uses tBNB (no real funds)</div>
+    <div style="margin:22px 0">
+      <button class="btn btn-primary" id="connectBtn" onclick="connectWallet()">🔗 Connect Wallet</button><br>
+      <button class="btn btn-secondary" id="startBtn" onclick="handleStartGame()">🎮 Start Game</button>
+    </div>
+    <p style="font-size:13px;color:#888">1 Play = <span id="costDisplay">0.0005</span> tBNB</p>
+    <p id="demoText" style="font-size:13px;color:#4caf50;margin-top:8px">🐬 Free Demo Play Available!</p>
+  </div>
+</div>
+
+<!-- ===== GAME OVER SCREEN ===== -->
+<div class="overlay" id="gameOverScreen">
+  <div class="overlay-bg"></div>
+  <div class="overlay-content">
+    <div id="goTitle" style="font-size:52px;font-weight:900;margin-bottom:4px;text-shadow:0 0 30px rgba(244,67,54,0.4)">GAME OVER</div>
+    <p id="goRank" style="font-size:26px;margin:8px 0"></p>
+    <div class="stats-box">
+      <p style="font-size:32px;font-weight:700" id="goScore">Score: 0</p>
+      <p style="font-size:14px;color:#7eb8d4;margin-top:4px" id="goHigh">High Score: 0</p>
+      <hr style="border-color:rgba(26,107,138,0.2);margin:14px 0">
+      <div class="stats-row">
+        <span id="goPearls">🫧 Pearls: 0</span>
+        <span id="goFish">🐟 Fish: 0</span>
+        <span id="goStars">⭐ Stars: 0</span>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="playAgainBtn" onclick="handleStartGame()">🎮 Play Again</button><br>
+    <button class="btn btn-secondary" onclick="showTitle()">🏠 Back to Menu</button>
+  </div>
+</div>
+
+<!-- ===== LOADING OVERLAY ===== -->
+<div id="loadingOverlay">
+  <div class="loading-bubbles">
+    <div class="loading-bubble" style="left:10%;width:20px;height:20px;animation-delay:0s;animation-duration:2.5s"></div>
+    <div class="loading-bubble" style="left:30%;width:14px;height:14px;animation-delay:0.5s;animation-duration:3s"></div>
+    <div class="loading-bubble" style="left:50%;width:24px;height:24px;animation-delay:1s;animation-duration:2.8s"></div>
+    <div class="loading-bubble" style="left:70%;width:16px;height:16px;animation-delay:0.3s;animation-duration:3.2s"></div>
+    <div class="loading-bubble" style="left:85%;width:18px;height:18px;animation-delay:0.8s;animation-duration:2.6s"></div>
+  </div>
+  <div class="spinner"></div>
+  <p id="loadingText" style="font-size:16px;z-index:1">🐬 Processing payment on BNB Testnet...</p>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div id="toast"></div>
+
+<!-- ===== SOUND TOGGLE ===== -->
+<div id="soundToggle" onclick="toggleSound()">🔊</div>
+
+<script>
+// ================================================================
+// 🔧 WEB3 CONFIGURATION — EDIT THESE CONSTANTS FOR YOUR SETUP
+// ================================================================
+const PAYMENT_ADDRESS = "0xYOUR_WALLET_ADDRESS_HERE";   // Arcade owner's receiving wallet
+const PLAY_COST       = "0.0005";                       // Cost in tBNB per play
+const TARGET_CHAIN_ID = "0x61";                         // BNB Smart Chain Testnet (decimal 97)
+const CHAIN_NAME      = "BNB Smart Chain Testnet";
+const CURRENCY_SYMBOL = "tBNB";
+const RPC_URL         = "https://data-seed-prebsc-1-s1.binance.org:8545/";
+const BLOCK_EXPLORER  = "https://testnet.bscscan.com";
+
+// ================================================================
+// 🎮 GAME TUNING CONSTANTS
+// ================================================================
+const BASE_SCROLL_SPEED   = 200;     // Base pixels/second scroll
+const SPEED_INCREASE_PCT  = 0.05;    // 5% speed increase per interval
+const SPEED_INTERVAL_SEC  = 15;      // Seconds between speed increases
+const SPIN_COOLDOWN_MS    = 3000;    // Spin boost cooldown
+const SPIN_DURATION_MS    = 500;     // Spin boost active duration
+const SPIN_SPEED_MULT     = 2.5;     // Speed multiplier during spin
+const COMBO_WINDOW_MS     = 2000;    // Time window for combo chain
+const STARFISH_INTERVAL_S = 30;      // Seconds between rare starfish spawns
+const DOLPHIN_ACCEL       = 1400;    // Vertical acceleration px/s²
+const DOLPHIN_FRICTION    = 0.91;    // Velocity damping per frame
+const DOLPHIN_MAX_VY      = 500;     // Max vertical speed
+const MAX_PARTICLES       = 120;
+const MAX_BUBBLES         = 60;
+
+// ================================================================
+// 🌐 WEB3 STATE
+// ================================================================
+let provider = null, signer = null, userAddress = null, userBalance = "0";
+let isCorrectChain = false;
+let credits = parseInt(sessionStorage.getItem("dolphinDashCredits") || "0");
+let demoUsed = localStorage.getItem("dolphinDashDemoUsed") === "true";
+
+// ================================================================
+// 🎮 GAME STATE
+// ================================================================
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+let W, H;
+let gameState = "title"; // title | playing | gameover
+let score = 0, displayScore = 0;
+let highScore = parseInt(localStorage.getItem("dolphinDashHigh") || "0");
+let scrollSpeed, gameTime, lastSpeedUp, lastStarfishTime;
+let soundEnabled = true;
+let lastFrameTime = 0;
+let shakeAmount = 0, shakeDamping = 0.88;
+let globalTime = 0; // Always ticks for title screen animations
+
+// Dolphin state
+const dolphin = {
+  x: 0, y: 0, vy: 0, width: 70, height: 36,
+  tailPhase: 0, spinAngle: 0, isSpinning: false,
+  spinTimer: 0, cooldownTimer: 0, glowTimer: 0,
+  moveUp: false, moveDown: false, alive: true
+};
+
+// Entity arrays
+let pearls = [], goldenFish = [], starfishArr = [];
+let jellyfishArr = [], seaMines = [], nets = [];
+let particles = [], trailBubbles = [], scorePopups = [];
+let bgBubbles = [], seaweedArr = [];
+
+// Stats
+let pearlsCollected = 0, fishCollected = 0, starsCollected = 0;
+let comboCount = 0, comboTimer = 0;
+let comboDisplay = { text: "", timer: 0, x: 0, y: 0 };
+
+// Spawn accumulators
+let spawnAcc = { pearl: 0, fish: 0, jelly: 0, mine: 0, net: 0 };
+
+// Title screen dolphin arc
+let titleDolphinArc = 0;
+
+// ================================================================
+// 🔊 AUDIO ENGINE — Web Audio API (no external files)
+// ================================================================
+let audioCtx = null, ambientSource = null, ambientGain = null;
+
+function ensureAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playTone(freq, dur, type = "sine", vol = 0.12, delay = 0) {
+  if (!soundEnabled || !audioCtx) return;
+  const t = audioCtx.currentTime + delay;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  osc.connect(g); g.connect(audioCtx.destination);
+  osc.start(t); osc.stop(t + dur);
+}
+
+function sfxPearl() {
+  playTone(1200, 0.1, "sine", 0.1);
+  playTone(1600, 0.08, "sine", 0.07, 0.04);
+}
+function sfxFish() {
+  playTone(600, 0.06, "triangle", 0.1);
+  playTone(900, 0.08, "sine", 0.08, 0.03);
+}
+function sfxStarfish() {
+  playTone(523, 0.1, "sine", 0.1);
+  playTone(659, 0.1, "sine", 0.1, 0.08);
+  playTone(784, 0.12, "sine", 0.12, 0.16);
+  playTone(1047, 0.15, "sine", 0.1, 0.24);
+}
+function sfxSpin() {
+  if (!soundEnabled || !audioCtx) return;
+  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.35, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+  const src = audioCtx.createBufferSource(); src.buffer = buf;
+  const filt = audioCtx.createBiquadFilter(); filt.type = "bandpass";
+  filt.frequency.setValueAtTime(3000, audioCtx.currentTime);
+  filt.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.35);
+  filt.Q.value = 2;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.12, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+  src.connect(filt); filt.connect(g); g.connect(audioCtx.destination);
+  src.start();
+}
+function sfxCollision() {
+  playTone(70, 0.35, "sawtooth", 0.15);
+  playTone(50, 0.5, "sine", 0.1);
+  // Bubble burst
+  if (!soundEnabled || !audioCtx) return;
+  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.15, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+  const src = audioCtx.createBufferSource(); src.buffer = buf;
+  const filt = audioCtx.createBiquadFilter(); filt.type = "highpass"; filt.frequency.value = 800;
+  const g = audioCtx.createGain(); g.gain.value = 0.08;
+  src.connect(filt); filt.connect(g); g.connect(audioCtx.destination);
+  src.start();
+}
+function sfxCombo() {
+  playTone(523, 0.07, "sine", 0.1);
+  playTone(659, 0.07, "sine", 0.1, 0.06);
+  playTone(784, 0.07, "sine", 0.1, 0.12);
+  playTone(1047, 0.12, "sine", 0.12, 0.18);
+}
+
+function startAmbient() {
+  if (!audioCtx || ambientSource) return;
+  const len = audioCtx.sampleRate * 2;
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  ambientSource = audioCtx.createBufferSource();
+  ambientSource.buffer = buf; ambientSource.loop = true;
+  const filt = audioCtx.createBiquadFilter(); filt.type = "lowpass"; filt.frequency.value = 180;
+  ambientGain = audioCtx.createGain();
+  ambientGain.gain.value = soundEnabled ? 0.025 : 0;
+  ambientSource.connect(filt); filt.connect(ambientGain); ambientGain.connect(audioCtx.destination);
+  ambientSource.start();
+}
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  document.getElementById("soundToggle").textContent = soundEnabled ? "🔊" : "🔇";
+  if (ambientGain) ambientGain.gain.value = soundEnabled ? 0.025 : 0;
+}
+
+// ================================================================
+// 🌐 WEB3 FUNCTIONS
+// ================================================================
+
+/** Update all Web3-related UI elements */
+function updateWeb3UI() {
+  const netEl = document.getElementById("networkStatus");
+  const walEl = document.getElementById("walletAddr");
+  const balEl = document.getElementById("balanceDisplay");
+  const credEl = document.getElementById("creditsDisplay");
+  const connectBtn = document.getElementById("connectBtn");
+  const demoText = document.getElementById("demoText");
+  const costEl = document.getElementById("costDisplay");
+
+  costEl.textContent = PLAY_COST;
+
+  if (userAddress) {
+    const short = userAddress.slice(0, 6) + "..." + userAddress.slice(-4);
+    walEl.textContent = "👛 " + short;
+    connectBtn.textContent = "✅ Connected";
+    connectBtn.className = "btn btn-secondary";
+    balEl.textContent = "💰 " + parseFloat(userBalance).toFixed(4) + " " + CURRENCY_SYMBOL;
+    netEl.innerHTML = isCorrectChain
+      ? '<span class="dot green"></span> BNB Testnet'
+      : '<span class="dot red"></span> Wrong Network';
+  } else {
+    walEl.textContent = "🔗 No Wallet";
+    connectBtn.textContent = "🔗 Connect Wallet";
+    connectBtn.className = "btn btn-primary";
+    balEl.textContent = "";
+    netEl.innerHTML = '<span class="dot gray"></span> Not Connected';
+  }
+
+  credEl.textContent = credits > 0 ? ("🎮 " + credits + " play" + (credits > 1 ? "s" : "")) : "";
+  demoText.textContent = demoUsed ? "Demo play used" : "🐬 Free Demo Play Available!";
+  demoText.style.color = demoUsed ? "#666" : "#4caf50";
+
+  // Play again button text
+  const pab = document.getElementById("playAgainBtn");
+  if (pab) {
+    if (credits > 0) pab.textContent = "🎮 Play Again (" + credits + " credit" + (credits > 1 ? "s" : "") + ")";
+    else if (!demoUsed) pab.textContent = "🎮 Free Demo Play";
+    else pab.textContent = "💰 Pay & Play Again";
+  }
+}
+
+/** Connect wallet via MetaMask / injected provider */
+async function connectWallet() {
+  if (!window.ethereum) {
+    showToast("⚠️ No wallet detected! Please install <a href='https://metamask.io' target='_blank'>MetaMask</a>.");
+    return;
+  }
+  try {
+    ensureAudio();
+    provider = new ethers.BrowserProvider(window.ethereum);
+    const accounts = await provider.send("eth_requestAccounts", []);
+    signer = await provider.getSigner();
+    userAddress = accounts[0];
+    console.log("🔗 Wallet connected:", userAddress);
+
+    await checkAndSwitchChain();
+    await refreshBalance();
+    updateWeb3UI();
+
+    // Listen for chain changes
+    window.ethereum.on("chainChanged", async (chainId) => {
+      console.log("⛓️ Chain changed to:", chainId);
+      isCorrectChain = chainId.toLowerCase() === TARGET_CHAIN_ID.toLowerCase();
+      provider = new ethers.BrowserProvider(window.ethereum);
+      signer = await provider.getSigner();
+      await refreshBalance();
+      updateWeb3UI();
+    });
+
+    // Listen for account changes
+    window.ethereum.on("accountsChanged", async (accounts) => {
+      if (accounts.length === 0) {
+        console.log("👛 Wallet disconnected");
+        userAddress = null; signer = null; userBalance = "0";
+      } else {
+        console.log("👛 Account changed to:", accounts[0]);
+        userAddress = accounts[0];
+        provider = new ethers.BrowserProvider(window.ethereum);
+        signer = await provider.getSigner();
+        await refreshBalance();
+      }
+      updateWeb3UI();
+    });
+
+    showToast("✅ Wallet connected successfully!");
+  } catch (e) {
+    console.error("❌ Connection error:", e);
+    if (e.code === 4001) showToast("❌ Connection rejected by user.");
+    else showToast("❌ Connection failed: " + (e.shortMessage || e.message));
+  }
+}
+
+/** Check current chain and switch to BNB Testnet if needed */
+async function checkAndSwitchChain() {
+  try {
+    const chainId = await window.ethereum.request({ method: "eth_chainId" });
+    console.log("⛓️ Current chain:", chainId);
+    isCorrectChain = chainId.toLowerCase() === TARGET_CHAIN_ID.toLowerCase();
+
+    if (!isCorrectChain) {
+      showToast("🔗 Please switch to " + CHAIN_NAME + " to play!");
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: TARGET_CHAIN_ID }]
+        });
+        isCorrectChain = true;
+        console.log("✅ Switched to BNB Testnet");
+      } catch (switchErr) {
+        // Chain not added — add it
+        if (switchErr.code === 4902 || switchErr.message?.includes("Unrecognized chain")) {
+          console.log("⛓️ Adding BNB Testnet to wallet...");
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+              chainId: TARGET_CHAIN_ID,
+              chainName: CHAIN_NAME,
+              nativeCurrency: { name: CURRENCY_SYMBOL, symbol: CURRENCY_SYMBOL, decimals: 18 },
+              rpcUrls: [RPC_URL],
+              blockExplorerUrls: [BLOCK_EXPLORER]
+            }]
+          });
+          isCorrectChain = true;
+          console.log("✅ BNB Testnet added and switched");
+        } else {
+          throw switchErr;
+        }
+      }
+    }
+  } catch (e) {
+    console.error("⛓️ Chain switch error:", e);
+    showToast("⚠️ Could not switch network. Please switch to BNB Testnet manually in your wallet.");
+  }
+}
+
+/** Refresh user's tBNB balance */
+async function refreshBalance() {
+  if (!provider || !userAddress) return;
+  try {
+    const bal = await provider.getBalance(userAddress);
+    userBalance = ethers.formatEther(bal);
+    console.log("💰 Balance:", userBalance, CURRENCY_SYMBOL);
+  } catch (e) {
+    console.error("💰 Balance fetch error:", e);
+  }
+}
+
+/** Process tBNB payment for game credits */
+async function processPayment() {
+  // Step 1: Ensure wallet connected
+  if (!userAddress) {
+    await connectWallet();
+    if (!userAddress) return false;
+  }
+
+  // Step 2: Ensure correct chain
+  if (!isCorrectChain) {
+    await checkAndSwitchChain();
+    updateWeb3UI();
+    if (!isCorrectChain) {
+      showToast("⚠️ Please switch to " + CHAIN_NAME + "!");
+      return false;
+    }
+  }
+
+  // Step 3: Check balance
+  await refreshBalance();
+  const costWei = ethers.parseEther(PLAY_COST);
+  const balWei = ethers.parseEther(userBalance);
+  if (balWei < costWei) {
+    showToast('⚠️ Insufficient ' + CURRENCY_SYMBOL + '! Get testnet BNB from <a href="https://www.bnbchain.org/en/testnet-faucet" target="_blank">the faucet</a>.');
+    return false;
+  }
+
+  // Step 4: Send transaction
+  showLoading(true, "🐬 Processing payment on " + CHAIN_NAME + "...");
+  try {
+    console.log("📤 Sending", PLAY_COST, CURRENCY_SYMBOL, "to", PAYMENT_ADDRESS);
+    const tx = await signer.sendTransaction({
+      to: PAYMENT_ADDRESS,
+      value: costWei
+    });
+    console.log("📤 TX hash:", tx.hash);
+
+    // Step 5: Wait for confirmation
+    showLoading(true, "⏳ Waiting for block confirmation...");
+    const receipt = await tx.wait(1);
+    console.log("✅ TX confirmed in block:", receipt.blockNumber);
+
+    showLoading(false);
+    const txLink = BLOCK_EXPLORER + "/tx/" + tx.hash;
+    showToast('✅ Payment confirmed! Let\'s dive in! <a href="' + txLink + '" target="_blank">View TX ↗</a>', 3000);
+
+    // Add credit
+    credits++;
+    sessionStorage.setItem("dolphinDashCredits", credits.toString());
+    await refreshBalance();
+    updateWeb3UI();
+
+    // Wait a moment so user sees confirmation
+    await new Promise(r => setTimeout(r, 1500));
+    return true;
+
+  } catch (e) {
+    showLoading(false);
+    if (e.code === "ACTION_REJECTED" || e.code === 4001 || e.info?.error?.code === 4001) {
+      console.log("❌ User rejected transaction");
+      showToast("❌ Transaction cancelled.");
+    } else {
+      console.error("❌ TX error:", e);
+      showToast("❌ Transaction failed: " + (e.shortMessage || e.reason || e.message));
+    }
+    return false;
+  }
+}
+
+// ================================================================
+// 🎨 UI HELPERS
+// ================================================================
+let toastTimeout = null;
+function showToast(msg, duration = 4500) {
+  const t = document.getElementById("toast");
+  t.innerHTML = msg;
+  t.classList.add("show");
+  if (toastTimeout) clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => t.classList.remove("show"), duration);
+}
+
+function showLoading(show, text) {
+  const el = document.getElementById("loadingOverlay");
+  if (show) {
+    document.getElementById("loadingText").textContent = text || "";
+    el.classList.add("active");
+  } else {
+    el.classList.remove("active");
+  }
+}
+
+function showScreen(id) {
+  document.querySelectorAll(".overlay").forEach(o => o.classList.remove("active"));
+  if (id) document.getElementById(id).classList.add("active");
+}
+
+function showTitle() {
+  gameState = "title";
+  showScreen("titleScreen");
+  updateWeb3UI();
+}
+
+// ================================================================
+// 🎮 GAME FLOW
+// ================================================================
+function resizeCanvas() {
+  const barH = document.getElementById("web3-bar").offsetHeight;
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight - barH;
+  canvas.style.top = barH + "px";
+}
+
+/** Handle start game button — manages credits/demo/payment */
+async function handleStartGame() {
+  ensureAudio();
+  startAmbient();
+
+  if (credits > 0) {
+    // Use existing credit
+    credits--;
+    sessionStorage.setItem("dolphinDashCredits", credits.toString());
+    updateWeb3UI();
+    beginGame();
+  } else if (!demoUsed) {
+    // Free demo play
+    demoUsed = true;
+    localStorage.setItem("dolphinDashDemoUsed", "true");
+    updateWeb3UI();
+    showToast("🐬 Enjoy your free demo play!");
+    beginGame();
+  } else {
+    // Need payment
+    const paid = await processPayment();
+    if (paid) {
+      credits--;
+      sessionStorage.setItem("dolphinDashCredits", credits.toString());
+      updateWeb3UI();
+      beginGame();
+    }
+  }
+}
+
+/** Initialize and start gameplay */
+function beginGame() {
+  resetGameState();
+  showScreen(null);
+  gameState = "playing";
+}
+
+/** Reset all game state for a new run */
+function resetGameState() {
+  score = 0; displayScore = 0;
+  scrollSpeed = BASE_SCROLL_SPEED;
+  gameTime = 0; lastSpeedUp = 0; lastStarfishTime = -20;
+  pearlsCollected = 0; fishCollected = 0; starsCollected = 0;
+  comboCount = 0; comboTimer = 0; shakeAmount = 0;
+  comboDisplay = { text: "", timer: 0, x: 0, y: 0 };
+
+  dolphin.x = W * 0.15;
+  dolphin.y = H * 0.5;
+  dolphin.vy = 0;
+  dolphin.isSpinning = false;
+  dolphin.spinTimer = 0;
+  dolphin.cooldownTimer = 0;
+  dolphin.spinAngle = 0;
+  dolphin.glowTimer = 0;
+  dolphin.tailPhase = 0;
+  dolphin.alive = true;
+
+  pearls = []; goldenFish = []; starfishArr = [];
+  jellyfishArr = []; seaMines = []; nets = [];
+  particles = []; trailBubbles = []; scorePopups = [];
+  spawnAcc = { pearl: 0, fish: 0, jelly: 0, mine: 0, net: 0 };
+
+  // Init background elements
+  bgBubbles = [];
+  for (let i = 0; i < 35; i++) {
+    bgBubbles.push({
+      x: Math.random() * W, y: Math.random() * H,
+      r: 1 + Math.random() * 4, speed: 18 + Math.random() * 35,
+      alpha: 0.08 + Math.random() * 0.25, wobble: Math.random() * Math.PI * 2
+    });
+  }
+  seaweedArr = [];
+  for (let i = 0; i < 10; i++) {
+    seaweedArr.push({
+      x: Math.random() * W * 1.2,
+      h: 50 + Math.random() * 120,
+      phase: Math.random() * Math.PI * 2,
+      segments: 5 + Math.floor(Math.random() * 5),
+      hue: 100 + Math.random() * 40
+    });
+  }
+}
+
+/** Trigger game over */
+function triggerGameOver() {
+  if (!dolphin.alive) return;
+  dolphin.alive = false;
+  gameState = "gameover";
+  sfxCollision();
+  shakeAmount = 18;
+
+  // Explosion of particles
+  for (let i = 0; i < 35; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 80 + Math.random() * 250;
+    addParticle(dolphin.x, dolphin.y,
+      Math.cos(angle) * speed, Math.sin(angle) * speed,
+      0.5 + Math.random() * 0.6,
+      `rgba(${180 + Math.random()*75|0},${200 + Math.random()*55|0},255,0.8)`,
+      2 + Math.random() * 3);
+  }
+
+  // Save high score
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem("dolphinDashHigh", highScore.toString());
+  }
+
+  // Show game over screen after a beat
+  setTimeout(() => {
+    document.getElementById("goScore").textContent = "Score: " + score;
+    document.getElementById("goHigh").textContent = "High Score: " + highScore;
+    document.getElementById("goPearls").textContent = "🫧 Pearls: " + pearlsCollected;
+    document.getElementById("goFish").textContent = "🐟 Fish: " + fishCollected;
+    document.getElementById("goStars").textContent = "⭐ Stars: " + starsCollected;
+
+    let rank;
+    if (score > 1000) rank = "Dolphin King 🐬👑";
+    else if (score > 600) rank = "Shark 🦈";
+    else if (score > 300) rank = "Turtle 🐢";
+    else if (score > 100) rank = "Seahorse 🐴";
+    else rank = "Guppy 🐟";
+    document.getElementById("goRank").textContent = rank;
+
+    updateWeb3UI();
+    showScreen("gameOverScreen");
+  }, 900);
+}
+
+// ================================================================
+// ENTITY SPAWNING
+// ================================================================
+function spawnEntities(dt) {
+  const diff = 1 + gameTime / 50; // Difficulty ramp
+
+  spawnAcc.pearl += dt;
+  if (spawnAcc.pearl > 0.55 / diff) {
+    spawnAcc.pearl = 0;
+    if (pearls.length < 15) {
+      pearls.push({
+        x: W + 20, y: 30 + Math.random() * (H - 60),
+        r: 10, shimmerPhase: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
+  spawnAcc.fish += dt;
+  if (spawnAcc.fish > 1.4 / diff) {
+    spawnAcc.fish = 0;
+    if (goldenFish.length < 10) {
+      goldenFish.push({
+        x: W + 20, y: 40 + Math.random() * (H - 80),
+        phase: Math.random() * Math.PI * 2,
+        size: 12 + Math.random() * 8, baseY: 0
+      });
+      goldenFish[goldenFish.length - 1].baseY = goldenFish[goldenFish.length - 1].y;
+    }
+  }
+
+  // Rare starfish
+  if (gameTime - lastStarfishTime > STARFISH_INTERVAL_S) {
+    lastStarfishTime = gameTime;
+    starfishArr.push({
+      x: W + 25, y: 50 + Math.random() * (H - 100),
+      r: 20, hue: 0
+    });
+  }
+
+  spawnAcc.jelly += dt;
+  if (spawnAcc.jelly > 2.8 / diff) {
+    spawnAcc.jelly = 0;
+    if (jellyfishArr.length < 8) {
+      jellyfishArr.push({
+        x: W + 35, y: 40 + Math.random() * (H - 80),
+        phase: Math.random() * Math.PI * 2,
+        baseY: 0, w: 26 + Math.random() * 10, h: 32 + Math.random() * 10
+      });
+      jellyfishArr[jellyfishArr.length - 1].baseY = jellyfishArr[jellyfishArr.length - 1].y;
+    }
+  }
+
+  spawnAcc.mine += dt;
+  if (spawnAcc.mine > 4.5 / diff) {
+    spawnAcc.mine = 0;
+    if (seaMines.length < 6) {
+      seaMines.push({
+        x: W + 25, y: 50 + Math.random() * (H - 100),
+        r: 18, pulsePhase: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
+  spawnAcc.net += dt;
+  if (spawnAcc.net > 7.5 / diff) {
+    spawnAcc.net = 0;
+    if (nets.length < 3) {
+      const gapY = 50 + Math.random() * (H - 220);
+      const gapH = 85 + Math.random() * 50;
+      nets.push({ x: W + 10, gapY, gapH, w: 35 });
+    }
+  }
+}
+
+function addParticle(x, y, vx, vy, life, color, size = 2) {
+  if (particles.length >= MAX_PARTICLES) particles.shift();
+  particles.push({ x, y, vx, vy, life, maxLife: life, color, size });
+}
+
+function addBubble(x, y) {
+  if (trailBubbles.length >= MAX_BUBBLES) trailBubbles.shift();
+  trailBubbles.push({
+    x, y, r: 1 + Math.random() * 3.5,
+    vy: -(25 + Math.random() * 45),
+    vx: (Math.random() - 0.5) * 15,
+    life: 0.8 + Math.random() * 0.8
+  });
+}
+
+// ================================================================
+// COLLISION HELPERS
+// ================================================================
+function distSq(x1, y1, x2, y2) { return (x1 - x2) ** 2 + (y1 - y2) ** 2; }
+function circlesCollide(x1, y1, r1, x2, y2, r2) { return distSq(x1, y1, x2, y2) < (r1 + r2) ** 2; }
+
+function dolphinHitsRect(rx, ry, rw, rh) {
+  // Approximate dolphin as ellipse, check overlap with rect
+  const cx = dolphin.x, cy = dolphin.y;
+  const hw = dolphin.width * 0.45, hh = dolphin.height * 0.45;
+  const closestX = Math.max(rx, Math.min(cx, rx + rw));
+  const closestY = Math.max(ry, Math.min(cy, ry + rh));
+  const dx = (closestX - cx) / hw, dy = (closestY - cy) / hh;
+  return dx * dx + dy * dy < 1;
+}
+
+// ================================================================
+// COLLECT ITEM
+// ================================================================
+function collectItem(x, y, pts, type) {
+  score += pts;
+  dolphin.glowTimer = 0.25;
+
+  if (type === "pearl") { pearlsCollected++; sfxPearl(); }
+  else if (type === "fish") { fishCollected++; sfxFish(); }
+  else if (type === "starfish") { starsCollected++; sfxStarfish(); }
+
+  // Score popup
+  scorePopups.push({ x, y, text: "+" + pts, life: 1.2, maxLife: 1.2, color: type === "starfish" ? "#ff88ff" : "#ffffaa" });
+
+  // Sparkle particles
+  for (let i = 0; i < 8; i++) {
+    const a = Math.random() * Math.PI * 2;
+    addParticle(x, y, Math.cos(a) * (60 + Math.random() * 100), Math.sin(a) * (60 + Math.random() * 100),
+      0.35 + Math.random() * 0.25,
+      type === "starfish" ? `hsl(${Math.random()*360},80%,70%)` : "rgba(255,255,200,0.9)",
+      1.5 + Math.random() * 2);
+  }
+
+  // Combo system
+  comboCount++;
+  comboTimer = COMBO_WINDOW_MS;
+  if (comboCount >= 3) {
+    sfxCombo();
+    const bonus = comboCount * 5;
+    score += bonus;
+    comboDisplay = { text: "COMBO x" + comboCount + "!", timer: 1.8, x: dolphin.x, y: dolphin.y - 50 };
+  }
+}
+
+// ================================================================
+// UPDATE LOOP
+// ================================================================
+function update(dt) {
+  globalTime += dt;
+
+  // Always update background bubbles (for title screen too)
+  for (const b of bgBubbles) {
+    b.y -= b.speed * dt;
+    b.x += Math.sin(globalTime * 1.5 + b.wobble + b.y * 0.008) * 8 * dt;
+    if (b.y < -10) { b.y = H + 10; b.x = Math.random() * W; }
+  }
+
+  if (gameState !== "playing") return;
+
+  gameTime += dt;
+
+  // Speed ramp
+  if (gameTime - lastSpeedUp > SPEED_INTERVAL_SEC) {
+    lastSpeedUp = gameTime;
+    scrollSpeed *= (1 + SPEED_INCREASE_PCT);
+  }
+
+  const effSpeed = dolphin.isSpinning ? scrollSpeed * SPIN_SPEED_MULT : scrollSpeed;
+
+  // ---- DOLPHIN PHYSICS ----
+  let accel = 0;
+  if (dolphin.moveUp) accel -= DOLPHIN_ACCEL;
+  if (dolphin.moveDown) accel += DOLPHIN_ACCEL;
+  dolphin.vy += accel * dt;
+  dolphin.vy *= DOLPHIN_FRICTION;
+  dolphin.vy = Math.max(-DOLPHIN_MAX_VY, Math.min(DOLPHIN_MAX_VY, dolphin.vy));
+  dolphin.y += dolphin.vy * dt;
+  dolphin.y = Math.max(25, Math.min(H - 25, dolphin.y));
+  dolphin.tailPhase += dt * (7 + Math.abs(dolphin.vy) * 0.005);
+
+  // Spin boost
+  if (dolphin.cooldownTimer > 0) dolphin.cooldownTimer -= dt * 1000;
+  if (dolphin.isSpinning) {
+    dolphin.spinTimer -= dt * 1000;
+    dolphin.spinAngle += dt * 18;
+    if (dolphin.spinTimer <= 0) {
+      dolphin.isSpinning = false;
+      dolphin.spinAngle = 0;
+    }
+  }
+  if (dolphin.glowTimer > 0) dolphin.glowTimer -= dt;
+
+  // Trail bubbles
+  if (Math.random() < 0.35) addBubble(dolphin.x - 30 + Math.random() * 5, dolphin.y + (Math.random() - 0.5) * 14);
+  if (dolphin.isSpinning && Math.random() < 0.7) {
+    addParticle(dolphin.x - 25 + Math.random() * 10, dolphin.y + (Math.random() - 0.5) * 25,
+      -120 - Math.random() * 80, (Math.random() - 0.5) * 50,
+      0.25, "rgba(180,220,255,0.5)", 1.5);
+  }
+
+  // Surface breach detection
+  if (dolphin.y < 30) {
+    // Splash particles
+    if (Math.random() < 0.3) {
+      addParticle(dolphin.x + Math.random() * 20, 5,
+        (Math.random() - 0.5) * 80, 30 + Math.random() * 60,
+        0.4, "rgba(200,230,255,0.6)", 2);
+    }
+  }
+
+  // ---- SPAWN ENTITIES ----
+  spawnEntities(dt);
+
+  // ---- UPDATE & COLLIDE PEARLS ----
+  for (let i = pearls.length - 1; i >= 0; i--) {
+    const p = pearls[i];
+    p.x -= effSpeed * dt;
+    p.shimmerPhase += dt * 4;
+    if (p.x < -25) { pearls.splice(i, 1); continue; }
+    if (circlesCollide(dolphin.x, dolphin.y, 28, p.x, p.y, p.r)) {
+      collectItem(p.x, p.y, 10, "pearl");
+      pearls.splice(i, 1);
+    }
+  }
+
+  // ---- UPDATE & COLLIDE GOLDEN FISH ----
+  for (let i = goldenFish.length - 1; i >= 0; i--) {
+    const f = goldenFish[i];
+    f.x -= effSpeed * dt;
+    f.phase += dt * 3.5;
+    f.y = f.baseY + Math.sin(f.phase) * 18;
+    f.baseY -= effSpeed * dt * 0; // fish stay at their Y
+    if (f.x < -25) { goldenFish.splice(i, 1); continue; }
+    if (circlesCollide(dolphin.x, dolphin.y, 26, f.x, f.y, f.size)) {
+      collectItem(f.x, f.y, 25, "fish");
+      goldenFish.splice(i, 1);
+    }
+  }
+
+  // ---- UPDATE & COLLIDE STARFISH ----
+  for (let i = starfishArr.length - 1; i >= 0; i--) {
+    const s = starfishArr[i];
+    s.x -= effSpeed * dt;
+    s.hue = (s.hue + dt * 150) % 360;
+    if (s.x < -30) { starfishArr.splice(i, 1); continue; }
+    if (circlesCollide(dolphin.x, dolphin.y, 30, s.x, s.y, s.r)) {
+      collectItem(s.x, s.y, 100, "starfish");
+      starfishArr.splice(i, 1);
+    }
+  }
+
+  // ---- UPDATE & COLLIDE JELLYFISH ----
+  for (let i = jellyfishArr.length - 1; i >= 0; i--) {
+    const j = jellyfishArr[i];
+    j.x -= effSpeed * dt;
+    j.phase += dt * 2.2;
+    j.y = j.baseY + Math.sin(j.phase) * 22;
+    if (j.x < -50) { jellyfishArr.splice(i, 1); continue; }
+    if (circlesCollide(dolphin.x, dolphin.y, 22, j.x, j.y, j.w * 0.5)) {
+      triggerGameOver(); return;
+    }
+  }
+
+  // ---- UPDATE & COLLIDE SEA MINES ----
+  for (let i = seaMines.length - 1; i >= 0; i--) {
+    const m = seaMines[i];
+    m.x -= effSpeed * dt;
+    m.pulsePhase += dt * 3.5;
+    if (m.x < -30) { seaMines.splice(i, 1); continue; }
+    if (circlesCollide(dolphin.x, dolphin.y, 24, m.x, m.y, m.r + 2)) {
+      triggerGameOver(); return;
+    }
+  }
+
+  // ---- UPDATE & COLLIDE NETS ----
+  for (let i = nets.length - 1; i >= 0; i--) {
+    const n = nets[i];
+    n.x -= effSpeed * dt;
+    if (n.x + n.w < -10) { nets.splice(i, 1); continue; }
+    // Check if dolphin is within net X range
+    if (dolphin.x + 25 > n.x && dolphin.x - 25 < n.x + n.w) {
+      // Must be within the gap
+      if (dolphin.y - 14 < n.gapY || dolphin.y + 14 > n.gapY + n.gapH) {
+        triggerGameOver(); return;
+      }
+    }
+  }
+
+  // ---- UPDATE PARTICLES ----
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vy += 40 * dt; // slight gravity
+    p.life -= dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // ---- UPDATE TRAIL BUBBLES ----
+  for (let i = trailBubbles.length - 1; i >= 0; i--) {
+    const b = trailBubbles[i];
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    b.life -= dt;
+    if (b.life <= 0) trailBubbles.splice(i, 1);
+  }
+
+  // ---- UPDATE SCORE POPUPS ----
+  for (let i = scorePopups.length - 1; i >= 0; i--) {
+    const sp = scorePopups[i];
+    sp.y -= 55 * dt;
+    sp.life -= dt;
+    if (sp.life <= 0) scorePopups.splice(i, 1);
+  }
+
+  // ---- COMBO TIMER ----
+  if (comboTimer > 0) {
+    comboTimer -= dt * 1000;
+    if (comboTimer <= 0) comboCount = 0;
+  }
+  if (comboDisplay.timer > 0) comboDisplay.timer -= dt;
+
+  // ---- SEAWEED SCROLL ----
+  for (const s of seaweedArr) {
+    s.x -= effSpeed * 0.25 * dt;
+    if (s.x < -40) { s.x = W + 40 + Math.random() * 120; s.h = 50 + Math.random() * 120; }
+  }
+
+  // ---- SCREEN SHAKE DECAY ----
+  if (shakeAmount > 0.3) shakeAmount *= shakeDamping;
+  else shakeAmount = 0;
+
+  // ---- SMOOTH SCORE DISPLAY ----
+  if (displayScore < score) {
+    displayScore += Math.max(1, Math.ceil((score - displayScore) * dt * 8));
+    if (displayScore > score) displayScore = score;
+  }
+}
+
+// ================================================================
+// DRAW FUNCTIONS
+// ================================================================
+
+/** Draw the ocean background (all parallax layers) */
+function drawBackground() {
+  // Ocean gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, "#1a6b8a");
+  grad.addColorStop(0.25, "#0f4a6b");
+  grad.addColorStop(0.6, "#0b2e4a");
+  grad.addColorStop(1, "#0a1628");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // God rays (far back)
+  ctx.save();
+  ctx.globalAlpha = 0.035;
+  for (let i = 0; i < 6; i++) {
+    const rx = ((W * 0.1 + i * W * 0.17) + globalTime * 8 + Math.sin(globalTime * 0.3 + i) * 30) % (W + 300) - 150;
+    const w = 60 + Math.sin(globalTime * 0.5 + i * 2) * 20;
+    ctx.beginPath();
+    ctx.moveTo(rx, 0);
+    ctx.lineTo(rx + w + 40, H);
+    ctx.lineTo(rx + w + 80, H);
+    ctx.lineTo(rx + 40, 0);
+    ctx.closePath();
+    ctx.fillStyle = "#7eb8d4";
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Caustic light patterns
+  ctx.save();
+  ctx.globalAlpha = 0.025;
+  for (let i = 0; i < 15; i++) {
+    const cx = (i * 110 + Math.sin(globalTime * 0.8 + i * 1.3) * 50) % (W + 40) - 20;
+    const cy = 30 + Math.sin(globalTime * 0.6 + i * 2.1) * 25 + (i % 5) * 50;
+    const r = 15 + Math.sin(globalTime * 2.5 + i * 0.7) * 10;
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.max(5, r), 0, Math.PI * 2);
+    ctx.fillStyle = "#aaddff";
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Seaweed (mid layer)
+  for (const s of seaweedArr) {
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = `hsl(${s.hue}, 50%, 25%)`;
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    let sx = s.x, sy = H;
+    ctx.moveTo(sx, sy);
+    for (let j = 1; j <= s.segments; j++) {
+      const t = j / s.segments;
+      const sway = Math.sin(globalTime * 1.2 + s.phase + j * 0.6) * 14 * t;
+      ctx.lineTo(sx + sway, sy - s.h * t);
+    }
+    ctx.stroke();
+    // Leaf blobs
+    for (let j = 2; j <= s.segments; j += 2) {
+      const t = j / s.segments;
+      const sway = Math.sin(globalTime * 1.2 + s.phase + j * 0.6) * 14 * t;
+      ctx.beginPath();
+      ctx.ellipse(sx + sway, sy - s.h * t, 6, 3, sway * 0.05, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${s.hue}, 45%, 30%, 0.4)`;
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Background bubbles (near layer)
+  for (const b of bgBubbles) {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(170,215,255,${b.alpha})`;
+    ctx.fill();
+    // Tiny highlight
+    ctx.beginPath();
+    ctx.arc(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${b.alpha * 0.5})`;
+    ctx.fill();
+  }
+
+  // Ocean surface ripple
